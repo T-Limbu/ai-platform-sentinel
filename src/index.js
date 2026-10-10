@@ -74,7 +74,7 @@ export async function runSentinelDiagnostic({
   let healingReport = null;
   if (heal && !diagnosis.isHealthy && serviceDir) {
     console.log(`\n🛠️ [Sentinel] Engaging Autonomous Self-Healing Loop...`);
-    healingReport = executeSelfHealing(diagnosis, serviceDir, infraRoot);
+    healingReport = await executeSelfHealing(diagnosis, serviceDir, infraRoot, { serviceName, env, targetUrl });
   }
 
   return {

@@ -85,8 +85,179 @@ export function healEnvDrift(serviceDir, infraRoot, env = 'qa', serviceName) {
   return { healed: false, reason: `Source environment template not found in ${sourceEnv}` };
 }
 
-export function executeSelfHealing(diagnosis, serviceDir, infraRoot) {
+export async function healRenderDeployment(serviceDir, serviceName, env = 'qa') {
+  const actions = [];
+  if (!serviceDir || !fs.existsSync(serviceDir)) {
+    return { healed: false, reason: `Service directory not found: ${serviceDir}` };
+  }
+
+  // 1. Patch render.yaml
+  const renderYamlPath = path.join(serviceDir, 'render.yaml');
+  if (fs.existsSync(renderYamlPath)) {
+    let content = fs.readFileSync(renderYamlPath, 'utf-8');
+    let modified = false;
+
+    if (content.includes('buildCommand: npm install && npm run build')) {
+      content = content.replaceAll(
+        'buildCommand: npm install && npm run build',
+        'buildCommand: npm install --include=dev && npm run build'
+      );
+      modified = true;
+      actions.push('Updated render.yaml buildCommand to: npm install --include=dev && npm run build');
+    }
+
+    if (!content.includes('NODE_VERSION')) {
+      content = content.replace(/(envVars:\s*\n(\s*-\s*key:[^\n]+\n\s*value:[^\n]+\n)*)/g, (match) => {
+        return match + '      - key: NODE_VERSION\n        value: 20\n';
+      });
+      modified = true;
+      actions.push('Injected NODE_VERSION: 20 into render.yaml');
+    }
+
+    if (modified) {
+      fs.writeFileSync(renderYamlPath, content, 'utf-8');
+    }
+  }
+
+  // 2. Patch package.json
+  const pkgPath = path.join(serviceDir, 'package.json');
+  if (fs.existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+      let modified = false;
+
+      if (!pkg.engines || !pkg.engines.node) {
+        pkg.engines = { ...pkg.engines, node: '>=20.0.0' };
+        modified = true;
+        actions.push('Added engines.node >=20.0.0 to package.json');
+      }
+
+      const criticalDeps = [
+        'vite',
+        'vue-tsc',
+        'typescript',
+        'tailwindcss',
+        'daisyui',
+        '@vitejs/plugin-vue',
+        'postcss',
+        'autoprefixer',
+      ];
+      pkg.dependencies = pkg.dependencies || {};
+      pkg.devDependencies = pkg.devDependencies || {};
+
+      for (const dep of criticalDeps) {
+        if (pkg.devDependencies[dep]) {
+          pkg.dependencies[dep] = pkg.devDependencies[dep];
+          delete pkg.devDependencies[dep];
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2), 'utf-8');
+        actions.push('Elevated build tools to production dependencies in package.json');
+      }
+    } catch (e) {}
+  }
+
+  // 3. Patch server/index.js
+  const expressFile = path.join(serviceDir, 'server/index.js');
+  if (fs.existsSync(expressFile)) {
+    let content = fs.readFileSync(expressFile, 'utf-8');
+    let modified = false;
+
+    if (content.includes('app.listen(PORT, () =>')) {
+      content = content.replace('app.listen(PORT, () =>', "app.listen(PORT, '0.0.0.0', () =>");
+      modified = true;
+      actions.push('Bound daemon listener explicitly to 0.0.0.0 in server/index.js');
+    }
+
+    if (!content.includes('/health')) {
+      const healthSnippet = `
+// [Sentinel Auto-Patch] Health check endpoints for Render
+app.get(['/health', '/api/health'], (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
+`;
+      content = content.replace(/(app\.use\([^\)]*\);)/, `$1\n${healthSnippet}`);
+      modified = true;
+      actions.push('Injected /health and /api/health endpoints into server/index.js');
+    }
+
+    if (modified) {
+      fs.writeFileSync(expressFile, content, 'utf-8');
+    }
+  }
+
+  // 4. Remote Render API sync
+  const renderApiKey = process.env.RENDER_API_KEY;
+  if (renderApiKey) {
+    try {
+      const candidates = [
+        serviceName,
+        `${serviceName}-${env}`,
+        `ai-platform-${serviceName}-${env}`,
+        `ai-app-${serviceName}-${env}`,
+      ];
+
+      const listRes = await fetch('https://api.render.com/v1/services?limit=50', {
+        headers: { Authorization: `Bearer ${renderApiKey}`, Accept: 'application/json' },
+      });
+
+      if (listRes.ok) {
+        const services = await listRes.json();
+        const match = services.find((s) => {
+          const name = s.service?.name?.toLowerCase();
+          const slug = s.service?.slug?.toLowerCase();
+          return candidates.some((c) => name === c.toLowerCase() || slug === c.toLowerCase());
+        });
+
+        if (match && match.service?.id) {
+          const srvId = match.service.id;
+          await fetch(`https://api.render.com/v1/services/${srvId}`, {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${renderApiKey}`,
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              serviceDetails: {
+                envSpecificDetails: {
+                  buildCommand: 'npm install --include=dev && npm run build',
+                  startCommand: 'npm run server',
+                },
+              },
+            }),
+          });
+          actions.push(`Synchronized service '${match.service.name}' buildCommand via Render REST API`);
+
+          await fetch(`https://api.render.com/v1/services/${srvId}/deploys`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${renderApiKey}`,
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ clearCache: 'clear' }),
+          });
+          actions.push(`Triggered fresh cloud deploy with cache clear for Render service ${srvId}`);
+        }
+      }
+    } catch (e) {
+      actions.push(`Render API sync skipped: ${e.message}`);
+    }
+  }
+
+  return {
+    healed: actions.length > 0,
+    actions,
+  };
+}
+
+export async function executeSelfHealing(diagnosis, serviceDir, infraRoot, context = {}) {
   const results = [];
+  const { serviceName, env } = context;
 
   for (const issue of diagnosis.issues) {
     if (issue.selfHealable && issue.healAction) {
@@ -94,6 +265,9 @@ export function executeSelfHealing(diagnosis, serviceDir, infraRoot) {
         results.push(healCorsIssue(serviceDir));
       } else if (issue.healAction === 'patch_spa_fallback' && serviceDir) {
         results.push(healSpaRouting(serviceDir));
+      } else if (issue.healAction === 'patch_render_deployment' && serviceDir) {
+        const renderRes = await healRenderDeployment(serviceDir, serviceName, env);
+        results.push(renderRes);
       }
     }
   }

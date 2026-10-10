@@ -20,10 +20,13 @@ export function diagnoseFailures({ serviceName, env, targetUrl, wakeResult, cors
       rootCause: 'Render container may be failed on boot, crashed due to an unhandled exception, or failing Render health checks.',
       remediation: [
         `Check Render container logs at: https://dashboard.render.com`,
-        `Verify startCommand binds to dynamic process.env.PORT instead of a hardcoded port.`,
+        `Verify buildCommand includes --include=dev so build tools are installed under NODE_ENV=production.`,
+        `Verify startCommand binds to dynamic process.env.PORT on host 0.0.0.0.`,
         `Verify required production environment variables are configured on Render service.`,
+        `Run with --heal to automatically patch render.yaml, server host bindings, and synchronize with Render REST API.`,
       ],
-      selfHealable: false,
+      selfHealable: true,
+      healAction: 'patch_render_deployment',
     });
   }
 

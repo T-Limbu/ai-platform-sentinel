@@ -7,6 +7,9 @@ import path from 'path';
 import { wakeUpNode, probeCors, probeSpaRouting, probeSseStream, probeApiEndpoints } from './probes/canary.js';
 import { diagnoseFailures } from './diagnostics/rootCause.js';
 import { executeSelfHealing } from './healer/autoPatch.js';
+import { runAutonomousHealingLoop } from './healer/healingLoop.js';
+
+export { runAutonomousHealingLoop };
 
 export async function runSentinelDiagnostic({
   serviceName = 'oplox',

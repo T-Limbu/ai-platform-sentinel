@@ -5,6 +5,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 
 export function healCorsIssue(serviceDir) {
   const expressFile = path.join(serviceDir, 'server/index.js');
@@ -190,7 +191,15 @@ app.get(['/health', '/api/health'], (req, res) => {
   }
 
   // 4. Remote Render API sync
-  const renderApiKey = process.env.RENDER_API_KEY;
+  let renderApiKey = process.env.RENDER_API_KEY;
+  if (!renderApiKey && process.platform === 'win32') {
+    try {
+      renderApiKey = execSync('powershell -NoProfile -Command "[System.Environment]::GetEnvironmentVariable(\'RENDER_API_KEY\', \'User\')"', {
+        encoding: 'utf-8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+    } catch (e) {}
+  }
   if (renderApiKey) {
     try {
       const candidates = [

@@ -7,7 +7,7 @@
  */
 
 import path from 'path';
-import { runSentinelDiagnostic } from '../src/index.js';
+import { runSentinelDiagnostic, runAutonomousHealingLoop } from '../src/index.js';
 
 const args = process.argv.slice(2);
 const command = args[0] || 'doctor';
@@ -26,7 +26,31 @@ async function main() {
   console.log(`🛡️  AI PLATFORM SENTINEL: Integration & QA Diagnostic Doctor`);
   console.log(`======================================================`);
 
-  if (command === 'test' || command === 'diagnose') {
+  if (command === 'loop' || command === 'heal-loop' || command === 'auto-heal') {
+    const service = args[1] || 'oplox';
+    let targetUrl = customUrl;
+
+    if (!targetUrl) {
+      if (env === 'local') targetUrl = 'http://localhost:5173';
+      else if (env === 'qa') targetUrl = `https://ai-platform-${service}-qa.onrender.com`;
+      else targetUrl = `https://ai-platform-${service}.onrender.com`;
+    }
+
+    const result = await runAutonomousHealingLoop({
+      serviceName: service,
+      env,
+      targetUrl,
+      serviceDir: path.resolve(`../${service}`),
+      infraRoot: path.resolve('../ai-platform-infra'),
+    });
+
+    if (result.report) {
+      printSummary(result.report);
+    }
+    if (!result.success) {
+      process.exit(1);
+    }
+  } else if (command === 'test' || command === 'diagnose') {
     const service = args[1] || 'oplox';
     let targetUrl = customUrl;
 
@@ -59,7 +83,8 @@ async function main() {
     printSummary(report);
   } else {
     console.log(`\nUsage:`);
-    console.log(`  node bin/sentinel.js test <service-name> [--env qa|prod|local] [--url <url>] [--heal]`);
+    console.log(`  node bin/sentinel.js loop <service-name> [--env qa|prod|local]   (Continuous autonomous heal-loop)`);
+    console.log(`  node bin/sentinel.js test <service-name> [--env qa|prod|local] [--heal]`);
     console.log(`  node bin/sentinel.js doctor`);
     process.exit(1);
   }

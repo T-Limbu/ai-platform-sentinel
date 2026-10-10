@@ -3,7 +3,6 @@ name: Test Suite & Quality Gate
 on:
   push:
     branches:
-      - dev
       - main
   pull_request:
     branches:
@@ -15,17 +14,9 @@ concurrency:
 
 jobs:
   test:
-    name: Run Unit Tests & Canary Probes
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Run Test Suite
-        run: npm test
+    uses: T-Limbu/ai-platform-workflows/.github/workflows/ci-test.yml@main
+    with:
+      working_directory: '.'
+      node_version: '20'
+      install_command: 'npm ci || npm install'
+      test_command: 'npm test'

@@ -15,6 +15,10 @@ export function healCorsIssue(serviceDir) {
       content = content.replace(/(const app = express\(\);)/, '$1\napp.use(cors({ origin: true, credentials: true }));');
       fs.writeFileSync(expressFile, content, 'utf-8');
       return { healed: true, file: expressFile, action: 'Added permissive CORS middleware to server/index.js' };
+    } else if (content.includes('app.use(cors());')) {
+      content = content.replace('app.use(cors());', 'app.use(cors({ origin: true, credentials: true }));');
+      fs.writeFileSync(expressFile, content, 'utf-8');
+      return { healed: true, file: expressFile, action: 'Upgraded CORS middleware to allow dynamic origins and credentials' };
     }
   }
 

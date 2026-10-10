@@ -61,7 +61,8 @@ export async function wakeUpNode(targetUrl, { maxAttempts = 6, intervalMs = 6000
 
 export async function probeCors(targetUrl, clientOrigin = 'https://ai-platform-oplox-qa.onrender.com') {
   try {
-    const preflight = await fetch(targetUrl, {
+    const probeUrl = targetUrl.includes('/api') ? targetUrl : `${targetUrl.replace(/\/$/, '')}/api/apps`;
+    const preflight = await fetch(probeUrl, {
       method: 'OPTIONS',
       headers: {
         Origin: clientOrigin,

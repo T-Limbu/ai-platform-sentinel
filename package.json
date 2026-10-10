@@ -1,0 +1,26 @@
+{
+  "name": "ai-platform-sentinel",
+  "version": "0.1.0",
+  "description": "Autonomous post-deploy integration validation, root cause diagnostician, and self-healing test mesh.",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "sentinel": "bin/sentinel.js"
+  },
+  "scripts": {
+    "test": "node test/canary.test.js",
+    "doctor": "node bin/sentinel.js doctor",
+    "fleet": "node bin/sentinel.js fleet --env qa"
+  },
+  "keywords": [
+    "testing",
+    "sentinel",
+    "diagnostics",
+    "self-healing",
+    "qa",
+    "render",
+    "oplox"
+  ],
+  "author": "Autonomous AI Data Squad",
+  "license": "MIT"
+}

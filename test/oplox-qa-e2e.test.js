@@ -188,6 +188,108 @@ async function main() {
       throw err;
     }
   });
+  // --- SECTION 7: ZERO-TRUST TEST ACCOUNT VERIFICATION & AUTHENTICATION MESH ---
+  let testAccountSessionToken = null;
+
+  await runStep('7.1 Negative: Strict Rejection of Wrong Password for Test Account', async () => {
+    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: 'sentinel_tester', password: 'WrongPassword999!' }),
+      signal: AbortSignal.timeout(6000),
+    });
+    assert.strictEqual(res.status, 401, `Expected 401 for wrong password, got ${res.status}`);
+    const data = await res.json();
+    assert(data.error && data.error.includes('Incorrect password'), `Expected error message about incorrect password, got '${data.error}'`);
+  });
+
+  await runStep('7.2 Negative: Strict Rejection of Non-Existent Account', async () => {
+    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: 'ghost_nonexistent_user', password: 'AnyPassword123!' }),
+      signal: AbortSignal.timeout(6000),
+    });
+    assert.strictEqual(res.status, 404, `Expected 404 for missing account, got ${res.status}`);
+    const data = await res.json();
+    assert(data.error && data.error.includes('not found'), `Expected error message about account not found, got '${data.error}'`);
+  });
+
+  await runStep('7.3 Positive: Test Account Authentication (sentinel_tester)', async () => {
+    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: 'sentinel_tester', password: 'Password123!' }),
+      signal: AbortSignal.timeout(6000),
+    });
+    assert.strictEqual(res.status, 200, `Expected 200 for valid test account login, got ${res.status}`);
+    const data = await res.json();
+    assert.strictEqual(data.success, true, 'Login response success must be true');
+    assert(data.token && data.token.length > 20, 'Expected valid session JWT token');
+    assert.strictEqual(data.user.email, 'sentinel.tester@oplox.dev', 'User email must match test account');
+    assert.strictEqual(data.user.role, 'Member', 'User role must be Member');
+    assert(Array.isArray(data.user.allowedAppIds), 'allowedAppIds must be an array');
+    assert(data.user.allowedAppIds.includes('audio-gym'), 'Must include audio-gym');
+    assert(data.user.allowedAppIds.includes('court-commander'), 'Must include court-commander');
+    assert(!data.user.allowedAppIds.includes('off-grid-video'), 'Must not include unentitled off-grid-video');
+    assert(data.user.offlineValidUntil, 'Must include offlineValidUntil grace timestamp');
+    testAccountSessionToken = data.token;
+  });
+
+  await runStep('7.4 Zero-Trust Session Verification via /api/auth/session (Bearer Token)', async () => {
+    assert(testAccountSessionToken, 'Test account token from 7.3 required');
+    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/auth/session`, {
+      headers: { Authorization: `Bearer ${testAccountSessionToken}` },
+      signal: AbortSignal.timeout(6000),
+    });
+    assert.strictEqual(res.status, 200, `Expected 200 for validated session, got ${res.status}`);
+    const data = await res.json();
+    assert.strictEqual(data.authenticated, true, 'Session must be authenticated');
+    assert.strictEqual(data.user.email, 'sentinel.tester@oplox.dev');
+    assert.strictEqual(data.user.role, 'Member');
+  });
+
+  await runStep('7.5 Negative: Rejection of Tampered / Invalid Bearer Token', async () => {
+    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/auth/session`, {
+      headers: { Authorization: `Bearer invalid.tampered.token` },
+      signal: AbortSignal.timeout(6000),
+    });
+    assert.strictEqual(res.status, 401, `Expected 401 for tampered token, got ${res.status}`);
+  });
+
+  const dynamicEmail = `sentinel.dynamic.${Date.now()}@oplox.dev`;
+  await runStep(`7.6 Dynamic Test Account Registration: ${dynamicEmail}`, async () => {
+    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Dynamic Sentinel Tester',
+        email: dynamicEmail,
+        password: 'SentinelDynamic2026!',
+        role: 'Member',
+        allowedAppIds: ['audio-gym'],
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+    assert.strictEqual(res.status, 201, `Expected 201 for registered account, got ${res.status}`);
+    const data = await res.json();
+    assert.strictEqual(data.success, true);
+    assert.strictEqual(data.user.email, dynamicEmail);
+    assert.deepStrictEqual(data.user.allowedAppIds, ['audio-gym']);
+  });
+
+  await runStep('7.7 Login with Dynamically Created Test Account', async () => {
+    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: dynamicEmail, password: 'SentinelDynamic2026!' }),
+      signal: AbortSignal.timeout(6000),
+    });
+    assert.strictEqual(res.status, 200, `Expected 200 for login with new account, got ${res.status}`);
+    const data = await res.json();
+    assert.strictEqual(data.success, true);
+    assert.strictEqual(data.user.email, dynamicEmail);
+  });
 
   // --- SUMMARY AUDIT TABLE ---
   console.log(`\n----------------------------------------------------------------------`);

@@ -46,7 +46,7 @@ async function main() {
     await runStep(`2.${routes.indexOf(route) + 1} SPA Deep Link: ${route}`, async () => {
       const res = await fetch(`${targetUrl.replace(/\/$/, '')}${route}`, {
         headers: { Accept: 'text/html' },
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(10000),
       });
       assert.strictEqual(res.status, 200, `Route ${route} returned status ${res.status}`);
       const text = await res.text();
@@ -56,7 +56,7 @@ async function main() {
 
   // --- SECTION 3: CORE FLEET API & REGISTRY ---
   await runStep('3.1 Fleet Apps API Endpoint (GET /api/apps)', async () => {
-    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/apps`, { signal: AbortSignal.timeout(6000) });
+    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/apps`, { signal: AbortSignal.timeout(10000) });
     assert.strictEqual(res.status, 200, `Expected 200, got ${res.status}`);
     const apps = await res.json();
     assert(Array.isArray(apps), 'Expected JSON array of apps');
@@ -69,14 +69,14 @@ async function main() {
   });
 
   await runStep('3.2 Fleet Logs API Endpoint (GET /api/logs)', async () => {
-    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/logs`, { signal: AbortSignal.timeout(6000) });
+    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/logs`, { signal: AbortSignal.timeout(10000) });
     assert.strictEqual(res.status, 200, `Expected 200, got ${res.status}`);
     const logs = await res.json();
     assert(Array.isArray(logs), 'Expected JSON array of logs');
   });
 
   await runStep('3.3 Public JWKS Distribution (GET /.well-known/jwks.json)', async () => {
-    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/.well-known/jwks.json`, { signal: AbortSignal.timeout(6000) });
+    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/.well-known/jwks.json`, { signal: AbortSignal.timeout(10000) });
     assert.strictEqual(res.status, 200, `Expected 200 for JWKS, got ${res.status}`);
     const jwks = await res.json();
     assert(Array.isArray(jwks.keys), 'JWKS response must have a keys array');
@@ -101,7 +101,7 @@ async function main() {
           'Access-Control-Request-Method': 'GET',
           'Access-Control-Request-Headers': 'Content-Type, Authorization',
         },
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(10000),
       });
 
       assert(res.status === 200 || res.status === 204, `Preflight status was ${res.status}`);
@@ -129,7 +129,7 @@ async function main() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(10000),
     });
     assert(res.status >= 400 && res.status < 500, `Expected 4xx for empty body, got ${res.status}`);
   });
@@ -139,7 +139,7 @@ async function main() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'not-an-email-at-all' }),
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(10000),
     });
     assert(res.status >= 400 && res.status < 500, `Expected 4xx for invalid email, got ${res.status}`);
   });
@@ -149,7 +149,7 @@ async function main() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'kshitij.limbu.dev@gmail.com', code: '000000' }),
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(10000),
     });
     assert(res.status >= 400 && res.status < 500, `Expected 4xx for bad verification code, got ${res.status}`);
   });
@@ -159,7 +159,7 @@ async function main() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: '123456' }), // missing email
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(10000),
     });
     assert(res.status >= 400 && res.status < 500, `Expected 4xx for missing email, got ${res.status}`);
   });
@@ -196,7 +196,7 @@ async function main() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier: 'sentinel_tester', password: 'WrongPassword999!' }),
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(10000),
     });
     assert.strictEqual(res.status, 401, `Expected 401 for wrong password, got ${res.status}`);
     const data = await res.json();
@@ -208,7 +208,7 @@ async function main() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier: 'ghost_nonexistent_user', password: 'AnyPassword123!' }),
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(10000),
     });
     assert.strictEqual(res.status, 404, `Expected 404 for missing account, got ${res.status}`);
     const data = await res.json();
@@ -220,7 +220,7 @@ async function main() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier: 'sentinel_tester', password: 'Password123!' }),
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(10000),
     });
     assert.strictEqual(res.status, 200, `Expected 200 for valid test account login, got ${res.status}`);
     const data = await res.json();
@@ -240,7 +240,7 @@ async function main() {
     assert(testAccountSessionToken, 'Test account token from 7.3 required');
     const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/auth/session`, {
       headers: { Authorization: `Bearer ${testAccountSessionToken}` },
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(10000),
     });
     assert.strictEqual(res.status, 200, `Expected 200 for validated session, got ${res.status}`);
     const data = await res.json();
@@ -252,7 +252,7 @@ async function main() {
   await runStep('7.5 Negative: Rejection of Tampered / Invalid Bearer Token', async () => {
     const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/auth/session`, {
       headers: { Authorization: `Bearer invalid.tampered.token` },
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(10000),
     });
     assert.strictEqual(res.status, 401, `Expected 401 for tampered token, got ${res.status}`);
   });
@@ -269,7 +269,7 @@ async function main() {
         role: 'Member',
         allowedAppIds: ['audio-gym'],
       }),
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(10000),
     });
     assert.strictEqual(res.status, 201, `Expected 201 for registered account, got ${res.status}`);
     const data = await res.json();

@@ -389,9 +389,12 @@ async function run() {
     const res = await fetch(`${OPLOX_QA_URL}/api/apps/user-data/court-commander`, {
       headers: { Authorization: `Bearer ${launchData.launchToken}` },
     });
-    assert.strictEqual(res.status, 200);
-    const result = await res.json();
-    assert.strictEqual(result.data, null, 'User Beta data partition must be null/empty, zero leakage of User Alpha');
+    // With zero-trust entitlement guard, unprovisioned user receives 403 Forbidden or 200 with null data
+    assert(res.status === 403 || res.status === 200, `Expected 403 or 200, got ${res.status}`);
+    if (res.status === 200) {
+      const result = await res.json();
+      assert.strictEqual(result.data, null, 'User Beta data partition must be null/empty, zero leakage of User Alpha');
+    }
   });
 
   // -------------------------------------------------------------------------

@@ -291,6 +291,120 @@ async function main() {
     assert.strictEqual(data.user.email, dynamicEmail);
   });
 
+  // --- SECTION 8: MULTI-TENANT PROVISIONING & STORAGE PARTITIONING (KSH-143 -> KSH-146) ---
+  const freshTenantEmail = `sentinel.tenant.${Date.now()}@oplox.dev`;
+  let freshTenantToken = null;
+
+  await runStep(`8.1 Fresh Account Starts with Zero Fleet Services: ${freshTenantEmail}`, async () => {
+    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Fresh Tenant Tester',
+        email: freshTenantEmail,
+        password: 'FreshTenantPassword2026!',
+        role: 'Member',
+        // Omit allowedAppIds so it defaults to empty fleet []
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+    assert.strictEqual(res.status, 201, `Expected 201 for fresh tenant registration, got ${res.status}`);
+    const data = await res.json();
+    assert.strictEqual(data.success, true);
+    assert(Array.isArray(data.user.allowedAppIds), 'allowedAppIds must be an array');
+    assert.strictEqual(data.user.allowedAppIds.length, 0, 'New member fleet must start completely empty');
+    freshTenantToken = data.token;
+    assert(freshTenantToken, 'Session token must be returned');
+  });
+
+  await runStep('8.2 Dynamic Service Addition: Add "off-grid-audio" to Fresh Fleet', async () => {
+    assert(freshTenantToken, 'Fresh tenant token required from 8.1');
+    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/auth/provision`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${freshTenantToken}`,
+      },
+      body: JSON.stringify({ appId: 'off-grid-audio' }),
+      signal: AbortSignal.timeout(6000),
+    });
+    assert.strictEqual(res.status, 200, `Expected 200 for provisioning, got ${res.status}`);
+    const data = await res.json();
+    assert.strictEqual(data.success, true);
+    assert(data.allowedAppIds.includes('off-grid-audio'), 'allowedAppIds must now contain "off-grid-audio"');
+  });
+
+  await runStep('8.3 Multi-Service Provisioning: Add "court-commander" & Verify Persistence', async () => {
+    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/auth/provision`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${freshTenantToken}`,
+      },
+      body: JSON.stringify({ appId: 'court-commander' }),
+      signal: AbortSignal.timeout(6000),
+    });
+    assert.strictEqual(res.status, 200, `Expected 200, got ${res.status}`);
+    const data = await res.json();
+    assert(data.allowedAppIds.includes('off-grid-audio'), 'Must retain previously provisioned service');
+    assert(data.allowedAppIds.includes('court-commander'), 'Must contain newly provisioned service');
+
+    // Confirm session endpoint reflects updated entitlements
+    const sessRes = await fetch(`${targetUrl.replace(/\/$/, '')}/api/auth/session`, {
+      headers: { Authorization: `Bearer ${freshTenantToken}` },
+      signal: AbortSignal.timeout(6000),
+    });
+    const sessData = await sessRes.json();
+    assert(sessData.user.allowedAppIds.includes('off-grid-audio'));
+    assert(sessData.user.allowedAppIds.includes('court-commander'));
+  });
+
+  await runStep('8.4 Dynamic Service Deprovisioning: Remove "off-grid-audio" from Fleet', async () => {
+    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/auth/unprovision`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${freshTenantToken}`,
+      },
+      body: JSON.stringify({ appId: 'off-grid-audio' }),
+      signal: AbortSignal.timeout(6000),
+    });
+    assert.strictEqual(res.status, 200, `Expected 200, got ${res.status}`);
+    const data = await res.json();
+    assert(!data.allowedAppIds.includes('off-grid-audio'), 'Must have removed "off-grid-audio"');
+    assert(data.allowedAppIds.includes('court-commander'), 'Must retain "court-commander"');
+  });
+
+  await runStep('8.5 Cross-App Launch Token Exchange for Court Commander', async () => {
+    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/auth/token/exchange`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${freshTenantToken}`,
+      },
+      body: JSON.stringify({ targetAppId: 'court-commander' }),
+      signal: AbortSignal.timeout(6000),
+    });
+    assert.strictEqual(res.status, 200, `Expected 200 for token exchange, got ${res.status}`);
+    const data = await res.json();
+    assert(data.launchToken, 'Must issue signed launchToken');
+    assert(data.launchUrl, 'Must return signed launchUrl');
+    assert(data.launchUrl.includes('token='), 'Launch URL must include token param');
+  });
+
+  await runStep('8.6 Negative: Rejection of Unauthorized Provisioning Request', async () => {
+    const res = await fetch(`${targetUrl.replace(/\/$/, '')}/api/auth/provision`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer fake.invalid.unauthorized.token',
+      },
+      body: JSON.stringify({ appId: 'audio-gym' }),
+      signal: AbortSignal.timeout(6000),
+    });
+    assert.strictEqual(res.status, 401, `Expected 401 for unauthorized provisioning, got ${res.status}`);
+  });
+
   // --- SUMMARY AUDIT TABLE ---
   console.log(`\n----------------------------------------------------------------------`);
   console.log(`📊 SENTINEL QA AUDIT SUMMARY REPORT`);

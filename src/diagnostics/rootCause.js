@@ -71,8 +71,29 @@ export function diagnoseFailures({ serviceName, env, targetUrl, wakeResult, cors
     });
   }
 
+  // 4a. A route that must be protected answered without credentials
+  const publicProtected = [
+    ...(sseResult && sseResult.protectionMissing ? [sseResult.endpoint] : []),
+    ...((apiResult && apiResult.endpoints) || []).filter((e) => e.protectionMissing).map((e) => e.endpoint),
+  ];
+  if (publicProtected.length > 0) {
+    issues.push({
+      code: 'PROTECTED_ENDPOINT_PUBLIC',
+      severity: 'CRITICAL',
+      title: `Protected endpoint answered without credentials: ${publicProtected.join(', ')}`,
+      description: `These routes must answer 401 without a token, but answered 200. Their protection is gone.`,
+      evidence: { endpoints: publicProtected },
+      rootCause: `An authentication middleware was removed or bypassed, or the wrong build is deployed.`,
+      remediation: [
+        `Check that the admin guard is applied to these routes and that the deployed version is the expected one.`,
+        `Treat the logs they expose (user emails, auth events) as readable by anyone until fixed.`,
+      ],
+      selfHealable: false,
+    });
+  }
+
   // 4. Diagnose SSE Streaming
-  if (sseResult && !sseResult.passed) {
+  if (sseResult && !sseResult.passed && !sseResult.protectionMissing) {
     issues.push({
       code: 'SSE_LOG_STREAM_DISCONNECTED',
       severity: 'WARNING',
@@ -89,8 +110,8 @@ export function diagnoseFailures({ serviceName, env, targetUrl, wakeResult, cors
   }
 
   // 5. Diagnose API Endpoints
-  if (apiResult && !apiResult.allPassed) {
-    const failedEps = apiResult.endpoints.filter((e) => !e.passed);
+  if (apiResult && !apiResult.allPassed && apiResult.endpoints.some((e) => !e.passed && !e.protectionMissing)) {
+    const failedEps = apiResult.endpoints.filter((e) => !e.passed && !e.protectionMissing);
     issues.push({
       code: 'CORE_API_UNAVAILABLE',
       severity: 'CRITICAL',

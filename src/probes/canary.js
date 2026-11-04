@@ -135,7 +135,9 @@ export async function probeSpaRouting(baseUrl, routes = ['/nodes', '/logs', '/me
   };
 }
 
-export async function probeSseStream(baseUrl, endpoint = '/api/logs/stream') {
+// `expect` is the status a healthy service answers without credentials: 200 for a public stream, 401 for a protected
+// one. A protected route that answers 200 has lost its protection, which is reported as protectionMissing.
+export async function probeSseStream(baseUrl, endpoint = '/api/logs/stream', expect = 200) {
   const fullUrl = new URL(endpoint, baseUrl).toString();
   try {
     const res = await fetch(fullUrl, {
@@ -145,12 +147,15 @@ export async function probeSseStream(baseUrl, endpoint = '/api/logs/stream') {
 
     const contentType = res.headers.get('content-type') || '';
     const isEventStream = contentType.includes('text/event-stream');
+    const passed = expect === 401 ? res.status === 401 : res.status === 200 && isEventStream;
 
     return {
-      passed: res.status === 200 && isEventStream,
+      passed,
       statusCode: res.status,
       contentType,
       endpoint,
+      expected: expect,
+      ...(expect === 401 && res.status === 200 ? { protectionMissing: true } : {}),
     };
   } catch (err) {
     return {
@@ -161,10 +166,14 @@ export async function probeSseStream(baseUrl, endpoint = '/api/logs/stream') {
   }
 }
 
+// Each endpoint is a path (must answer 200 with JSON) or { path, expect }. expect: 401 means the route is protected:
+// a 401 without credentials passes, and a 200 fails with protectionMissing.
 export async function probeApiEndpoints(baseUrl, endpoints = ['/api/apps', '/api/logs']) {
   const results = [];
 
-  for (const ep of endpoints) {
+  for (const entry of endpoints) {
+    const ep = typeof entry === 'string' ? entry : entry.path;
+    const expect = typeof entry === 'string' ? 200 : entry.expect || 200;
     const fullUrl = new URL(ep, baseUrl).toString();
     try {
       const res = await fetch(fullUrl, {
@@ -183,7 +192,9 @@ export async function probeApiEndpoints(baseUrl, endpoints = ['/api/apps', '/api
         endpoint: ep,
         statusCode: res.status,
         isJson,
-        passed: res.status === 200 && isJson,
+        passed: expect === 401 ? res.status === 401 : res.status === 200 && isJson,
+        expected: expect,
+        ...(expect === 401 && res.status === 200 ? { protectionMissing: true } : {}),
         sampleCount: Array.isArray(json) ? json.length : null,
       });
     } catch (err) {

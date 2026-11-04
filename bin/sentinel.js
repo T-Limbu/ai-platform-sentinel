@@ -77,7 +77,6 @@ async function main() {
       env: 'local',
       targetUrl: 'http://localhost:5170',
       routes: ['/nodes', '/logs', '/metrics'],
-      apiEndpoints: ['/api/apps', '/api/logs'],
     });
 
     printSummary(report);

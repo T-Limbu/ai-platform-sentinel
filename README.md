@@ -16,6 +16,20 @@
    - Verifies client routing (`/nodes`, `/logs`, `/metrics`) returns `index.html` instead of 404.
 4. **SSE Handshake Inspector**:
    - Ensures real-time log channels (`/api/logs/stream`) handshake without proxy buffering.
+
+### Expected status per endpoint
+
+Probes judge each endpoint by the status a healthy service gives **without credentials**.
+
+| Service | Endpoint | Expected | Meaning |
+| -- | -- | -- | -- |
+| `oplox` | `/api/apps` | 200 + JSON | public app list |
+| `oplox` | `/api/logs` | **401** | needs an admin session; the sentinel holds no token |
+| `oplox` | `/api/logs/stream` | **401** | same |
+| any other service | `/api/apps`, `/api/logs` | 200 + JSON | unchanged |
+| any other service | `/api/logs/stream` | 200 + `text/event-stream` | unchanged |
+
+A protected route that answers 200 fails with `PROTECTED_ENDPOINT_PUBLIC` (CRITICAL): its protection is gone. Pass `apiEndpoints` as paths or `{ path, expect: 200 | 401 }`, and `sseEndpoint` as `{ path, expect }`, to `runSentinelDiagnostic` to override.
 5. **Autonomous Self-Healing**:
    - Injects missing CORS middleware or SPA fallback directly into codebase when enabled (`--heal`).
 

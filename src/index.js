@@ -11,6 +11,11 @@ import { runAutonomousHealingLoop } from './healer/healingLoop.js';
 
 export { runAutonomousHealingLoop };
 
+// Oplox: /api/apps is public JSON; the log routes need an admin session, so 401 without a token is a pass.
+// The sentinel must not hold an admin token to read logs.
+export const OPLOX_API_ENDPOINTS = ['/api/apps', { path: '/api/logs', expect: 401 }];
+export const OPLOX_SSE_ENDPOINT = { path: '/api/logs/stream', expect: 401 };
+
 export async function runSentinelDiagnostic({
   serviceName = 'oplox',
   env = 'qa',
@@ -20,8 +25,15 @@ export async function runSentinelDiagnostic({
   clientOrigin = 'https://ai-platform-oplox-qa.onrender.com',
   heal = false,
   routes = ['/nodes', '/logs', '/metrics'],
-  apiEndpoints = ['/api/apps', '/api/logs'],
+  apiEndpoints,
+  sseEndpoint,
 }) {
+  // Oplox protects its log routes: without a token they answer 401, which is the healthy answer.
+  // Other services keep the old expectation (public, 200).
+  const isOplox = serviceName === 'oplox';
+  if (!apiEndpoints) apiEndpoints = isOplox ? OPLOX_API_ENDPOINTS : ['/api/apps', '/api/logs'];
+  if (!sseEndpoint) sseEndpoint = isOplox ? OPLOX_SSE_ENDPOINT : { path: '/api/logs/stream', expect: 200 };
+
   if (!targetUrl) {
     targetUrl = env === 'local' ? 'http://localhost:5173' : `https://${serviceName}-${env}.onrender.com`;
   }
@@ -51,7 +63,7 @@ export async function runSentinelDiagnostic({
 
     // Step 4: Real-time SSE Stream
     console.log(`   [4/5] Probing SSE log stream handshake...`);
-    sseResult = await probeSseStream(targetUrl);
+    sseResult = await probeSseStream(targetUrl, sseEndpoint.path, sseEndpoint.expect);
 
     // Step 5: Core API Health
     console.log(`   [5/5] Testing JSON API endpoints...`);

@@ -8,7 +8,7 @@
     "sentinel": "bin/sentinel.js"
   },
   "scripts": {
-    "test": "node test/canary.test.js",
+    "test": "node test/canary.test.js && node test/layout-check.test.js",
     "test:sync": "node test/cross-device-sync.test.js",
     "test:e2e": "playwright test",
     "doctor": "node bin/sentinel.js doctor",

@@ -3,7 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {
-  LAYOUT_MODULE, parseLayoutArgs, waitForHealth, buildQaConfig, fetchLayoutModule, sha256, runLayoutCheck,
+  LAYOUT_MODULE, parseLayoutArgs, waitForHealth, buildQaConfig, loadQaEnv, fetchLayoutModule, sha256, runLayoutCheck,
 } from '../src/layout/layoutCheck.js';
 
 console.log('🧪 Running layout-check command tests...');
@@ -63,11 +63,22 @@ console.log('🧪 Running layout-check command tests...');
     waitForHealth: async () => ({ ok: true, attempts: 1, waitedMs: 10 }),
     fetchAppConfig: async () => JSON.stringify({ baseUrl: 'x', login: { userEnv: 'a', passEnv: 'b' }, pages: [] }),
     fetchLayoutModule: async () => mod,
+    loadQaEnv: () => {},
   };
   assert.strictEqual(await runLayoutCheck({ app: 'oplox', env: 'qa', url: 'https://qa.example' }, deps), 1);
   assert.strictEqual(await runLayoutCheck({ app: 'oplox', env: 'qa', url: 'https://qa.example', reportOnly: true }, deps), 0);
   fs.rmSync(mod);
   delete process.env.SENTINEL_QA_PASSWORD;
   console.log('  ✓ runLayoutCheck orchestrates health, config and exit code (error vs report-only)');
+}
+{
+  const f = path.join(os.tmpdir(), 'lc-env-test');
+  fs.writeFileSync(f, ['SENTINEL_QA_PASSWORD="from-file"', 'OTHER=nope', 'SENTINEL_QA_USER=kept', ''].join('\n'));
+  const env = { SENTINEL_QA_USER: 'real' };
+  loadQaEnv(f, env);
+  assert.deepStrictEqual(env, { SENTINEL_QA_USER: 'real', SENTINEL_QA_PASSWORD: 'from-file' });
+  fs.rmSync(f);
+  loadQaEnv(f, env);
+  console.log('  ✓ loadQaEnv reads only SENTINEL_QA_* and never overrides real env');
 }
 console.log('✅ layout-check tests passed');

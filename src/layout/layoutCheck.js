@@ -34,6 +34,15 @@ export const LAYOUT_APPS = {
 export const QA_USER_ENV = 'SENTINEL_QA_USER'; // default: sentinel_tester
 export const QA_PASS_ENV = 'SENTINEL_QA_PASSWORD';
 
+/** Load SENTINEL_QA_* from a git-ignored .env in the cwd, without overriding real env vars. */
+export function loadQaEnv(file = path.resolve('.env'), env = process.env) {
+  if (!fs.existsSync(file)) return;
+  for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const m = line.match(/^\s*(SENTINEL_QA_[A-Z_]+)\s*=\s*(.*?)\s*$/);
+    if (m && env[m[1]] === undefined) env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
+  }
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export function sha256(buf) {
@@ -112,8 +121,9 @@ export async function runLayoutCheck(opts, deps = {}) {
   if (env !== 'qa') throw new Error('sentinel layout only runs against QA (--env qa); it signs in with a QA-only test account');
   const baseUrl = opts.url || app.qaUrl;
 
+  (deps.loadQaEnv || loadQaEnv)();
   process.env[QA_USER_ENV] ||= 'sentinel_tester';
-  if (!process.env[QA_PASS_ENV]) throw new Error(`set ${QA_PASS_ENV} (password of the seeded QA test account)`);
+  if (!process.env[QA_PASS_ENV]) throw new Error(`set ${QA_PASS_ENV} (password of the seeded QA test account) in the environment or a git-ignored .env`);
 
   console.log(`⏳ Waiting for ${baseUrl}${app.healthPath} (QA cold start can take ~50 s)...`);
   const health = await (deps.waitForHealth || waitForHealth)(baseUrl + app.healthPath, { timeoutMs: opts.healthTimeoutMs });

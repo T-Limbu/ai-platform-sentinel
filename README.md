@@ -40,7 +40,8 @@ node bin/sentinel.js doctor
 
 ```bash
 # needs the password of the seeded QA test account (never stored in this repo)
-export SENTINEL_QA_PASSWORD=...           # SENTINEL_QA_USER defaults to sentinel_tester
+# put SENTINEL_QA_PASSWORD=... in a git-ignored .env (or export it); SENTINEL_QA_USER defaults to sentinel_tester
+# npm run layout = report-only run for oplox
 node bin/sentinel.js layout oplox --env qa [--report-only] [--config file] [--url baseUrl] [--health-timeout 180]
 ```
 

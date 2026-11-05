@@ -33,3 +33,20 @@ node bin/sentinel.js test audio-gym --env qa --heal
 # Run local control plane diagnostic doctor
 node bin/sentinel.js doctor
 ```
+
+---
+
+## 📐 Responsive layout check (post-deploy)
+
+```bash
+# needs the password of the seeded QA test account (never stored in this repo)
+# put SENTINEL_QA_PASSWORD=... in a git-ignored .env (or export it); SENTINEL_QA_USER defaults to sentinel_tester
+# npm run layout = report-only run for oplox
+node bin/sentinel.js layout oplox --env qa [--report-only] [--config file] [--url baseUrl] [--health-timeout 180]
+```
+
+Waits for `/api/health` (QA cold start ~50 s), then runs the shared layout check
+(`T-Limbu/ai-platform-workflows` `layout-check/layout-check.mjs`, fetched at a pinned tag and verified
+against a pinned SHA-256 in `src/layout/layoutCheck.js`) with the app's `layout-check/<app>.layout.json`
+read from its repo through your `gh` login. Exits 1 on layout errors, 0 with `--report-only`.
+Requires `npx playwright install chromium`. QA only.

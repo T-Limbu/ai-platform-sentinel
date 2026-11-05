@@ -3,10 +3,12 @@
  * Sentinel CLI Runner
  * Usage:
  *   node bin/sentinel.js test oplox --env qa
+ *   node bin/sentinel.js layout oplox --env qa [--report-only]
  *   node bin/sentinel.js doctor
  */
 
 import path from 'path';
+import { parseLayoutArgs, runLayoutCheck } from '../src/layout/layoutCheck.js';
 import { runSentinelDiagnostic, runAutonomousHealingLoop } from '../src/index.js';
 
 const args = process.argv.slice(2);
@@ -70,6 +72,9 @@ async function main() {
     });
 
     printSummary(report);
+  } else if (command === 'layout') {
+    const code = await runLayoutCheck(parseLayoutArgs(args));
+    if (code !== 0) process.exit(code);
   } else if (command === 'doctor') {
     console.log(`\n🩺 Running Sentinel Doctor against Local Control Plane...`);
     const report = await runSentinelDiagnostic({
@@ -85,6 +90,7 @@ async function main() {
     console.log(`\nUsage:`);
     console.log(`  node bin/sentinel.js loop <service-name> [--env qa|prod|local]   (Continuous autonomous heal-loop)`);
     console.log(`  node bin/sentinel.js test <service-name> [--env qa|prod|local] [--heal]`);
+    console.log(`  node bin/sentinel.js layout <app> --env qa [--report-only] [--config file] [--url baseUrl]   (needs SENTINEL_QA_PASSWORD)`);
     console.log(`  node bin/sentinel.js doctor`);
     process.exit(1);
   }

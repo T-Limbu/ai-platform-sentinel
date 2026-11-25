@@ -3,8 +3,6 @@
  * Analyzes canary failure signatures and maps them to concrete integration problems and fixes.
  */
 
-import path from 'path';
-
 export function diagnoseFailures({ serviceName, env, targetUrl, wakeResult, corsResult, spaResult, sseResult, apiResult }) {
   const issues = [];
 

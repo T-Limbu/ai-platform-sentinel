@@ -3,7 +3,6 @@
  * Main diagnostic and self-healing runner API
  */
 
-import path from 'path';
 import { wakeUpNode, probeCors, probeSpaRouting, probeSseStream, probeApiEndpoints } from './probes/canary.js';
 import { diagnoseFailures } from './diagnostics/rootCause.js';
 import { executeSelfHealing } from './healer/autoPatch.js';
@@ -16,7 +15,6 @@ export async function runSentinelDiagnostic({
   env = 'qa',
   targetUrl,
   serviceDir,
-  infraRoot,
   clientOrigin = 'https://ai-platform-oplox-qa.onrender.com',
   heal = false,
   routes = ['/nodes', '/logs', '/metrics'],
@@ -70,14 +68,13 @@ export async function runSentinelDiagnostic({
     spaResult,
     sseResult,
     apiResult,
-    infraRoot: infraRoot || path.resolve('../ai-platform-infra'),
   });
 
   // Step 7: Autonomous Self-Healing (if enabled)
   let healingReport = null;
   if (heal && !diagnosis.isHealthy && serviceDir) {
     console.log(`\n🛠️ [Sentinel] Engaging Autonomous Self-Healing Loop...`);
-    healingReport = await executeSelfHealing(diagnosis, serviceDir, infraRoot, { serviceName, env, targetUrl });
+    healingReport = await executeSelfHealing(diagnosis, serviceDir, { serviceName, env, targetUrl });
   }
 
   return {

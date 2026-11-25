@@ -1,6 +1,6 @@
 /**
  * Remediation & Self-Healing Patcher
- * Automatically resolves common integration bugs (CORS allowlists, SPA catch-alls, .env drift).
+ * Automatically resolves common integration bugs (CORS allowlists, SPA catch-alls).
  */
 
 import fs from 'fs';
@@ -68,22 +68,6 @@ if (fs.existsSync(distPath)) {
     }
   }
   return { healed: false, reason: 'SPA fallback already present or unsupported server structure.' };
-}
-
-export function healEnvDrift(serviceDir, infraRoot, env = 'qa', serviceName) {
-  const sourceEnv = path.join(infraRoot, `environments/${env}/${serviceName}.env`);
-  const targetEnv = path.join(serviceDir, '.env');
-
-  if (fs.existsSync(sourceEnv)) {
-    fs.copyFileSync(sourceEnv, targetEnv);
-    return {
-      healed: true,
-      file: targetEnv,
-      action: `Synchronized .env from ai-platform-infra/environments/${env}/${serviceName}.env`,
-    };
-  }
-
-  return { healed: false, reason: `Source environment template not found in ${sourceEnv}` };
 }
 
 export async function healRenderDeployment(serviceDir, serviceName, env = 'qa') {
@@ -264,7 +248,7 @@ app.get(['/health', '/api/health'], (req, res) => {
   };
 }
 
-export async function executeSelfHealing(diagnosis, serviceDir, infraRoot, context = {}) {
+export async function executeSelfHealing(diagnosis, serviceDir, context = {}) {
   const results = [];
   const { serviceName, env } = context;
 

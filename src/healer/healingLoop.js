@@ -35,7 +35,6 @@ export async function runAutonomousHealingLoop({
   env = 'qa',
   targetUrl,
   serviceDir,
-  infraRoot,
   maxIterations = 5,
   pollIntervalMs = 15000,
   maxDeployWaitMs = 180000,
@@ -64,7 +63,6 @@ export async function runAutonomousHealingLoop({
       env,
       targetUrl,
       serviceDir,
-      infraRoot,
       heal: false,
     });
 

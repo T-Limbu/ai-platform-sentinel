@@ -41,7 +41,6 @@ async function main() {
       env,
       targetUrl,
       serviceDir: path.resolve(`../${service}`),
-      infraRoot: path.resolve('../ai-platform-infra'),
     });
 
     if (result.report) {
@@ -66,7 +65,6 @@ async function main() {
       targetUrl,
       heal: shouldHeal,
       serviceDir: path.resolve(`../${service}`),
-      infraRoot: path.resolve('../ai-platform-infra'),
     });
 
     printSummary(report);

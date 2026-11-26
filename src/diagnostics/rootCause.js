@@ -20,7 +20,7 @@ export function diagnoseFailures({ serviceName, env, targetUrl, wakeResult, cors
         `Verify buildCommand includes --include=dev so build tools are installed under NODE_ENV=production.`,
         `Verify startCommand binds to dynamic process.env.PORT on host 0.0.0.0.`,
         `Verify required production environment variables are configured on Render service.`,
-        `Run with --heal to automatically patch render.yaml, server host bindings, and synchronize with Render REST API.`,
+        `Run with --heal to write a proposed patch for render.yaml and server host bindings. Review it and apply it yourself.`,
       ],
       selfHealable: true,
       healAction: 'patch_render_deployment',
@@ -41,11 +41,9 @@ export function diagnoseFailures({ serviceName, env, targetUrl, wakeResult, cors
       },
       rootCause: `Cross-origin resource sharing middleware is either missing or does not include '${corsResult.testedOrigin}' in its allowlist.`,
       remediation: [
-        `Add '${corsResult.testedOrigin}' to cors({ origin: [...] }) in server configuration.`,
-        `Or enable cors() with permissive origin for QA environment ('*').`,
+        `Add '${corsResult.testedOrigin}' to the service's explicit CORS allow-list.`,
       ],
-      selfHealable: true,
-      healAction: 'patch_cors',
+      selfHealable: false,
     });
   }
 

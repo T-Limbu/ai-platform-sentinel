@@ -1,14 +1,14 @@
 {
   "name": "ai-platform-sentinel",
   "version": "0.1.0",
-  "description": "Autonomous post-deploy integration validation, root cause diagnostician, and self-healing test mesh.",
+  "description": "Autonomous post-deploy integration validation, root cause diagnostician, and propose-only self-healing test mesh.",
   "type": "module",
   "main": "src/index.js",
   "bin": {
     "sentinel": "bin/sentinel.js"
   },
   "scripts": {
-    "test": "node test/canary.test.js",
+    "test": "node test/canary.test.js && node test/healer-guards.test.js",
     "test:sync": "node test/cross-device-sync.test.js",
     "test:e2e": "playwright test",
     "doctor": "node bin/sentinel.js doctor",

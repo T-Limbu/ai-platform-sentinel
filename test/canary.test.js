@@ -35,8 +35,8 @@ console.log('🧪 Running Sentinel Diagnostic Unit Tests...');
   assert.strictEqual(diagnosis.isHealthy, false, 'Should flag CORS issue');
   const corsIssue = diagnosis.issues.find((i) => i.code === 'CORS_ORIGIN_BLOCKED');
   assert(corsIssue, 'Should detect CORS_ORIGIN_BLOCKED');
-  assert.strictEqual(corsIssue.selfHealable, true, 'CORS should be self-healable');
-  console.log('  ✓ Test 2: Correctly classifies CORS_ORIGIN_BLOCKED with selfHealable flag');
+  assert.strictEqual(corsIssue.selfHealable, false, 'CORS must never be self-healed');
+  console.log('  ✓ Test 2: Correctly classifies CORS_ORIGIN_BLOCKED as not self-healable');
 }
 
 // Test 3: Classifies SPA routing fallback missing

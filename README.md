@@ -1,8 +1,8 @@
 # 🛡️ AI Platform Sentinel
 
-> Autonomous Post-Deploy Integration Validation, Root Cause Diagnostician & Self-Healing Test Mesh.
+> Autonomous Post-Deploy Integration Validation, Root Cause Diagnostician & Propose-Only Self-Healing Test Mesh.
 
-`ai-platform-sentinel` automatically validates services after deployment to Render (or local testing), runs canary probes with cold-start tolerance, detects integration breakdowns (CORS, SPA fallback, environment drift, SSE stream drops), and initiates autonomous self-healing.
+`ai-platform-sentinel` automatically validates services after deployment to Render (or local testing), runs canary probes with cold-start tolerance, detects integration breakdowns (CORS, SPA fallback, environment drift, SSE stream drops), and can propose a fix for review.
 
 ---
 
@@ -16,8 +16,8 @@
    - Verifies client routing (`/nodes`, `/logs`, `/metrics`) returns `index.html` instead of 404.
 4. **SSE Handshake Inspector**:
    - Ensures real-time log channels (`/api/logs/stream`) handshake without proxy buffering.
-5. **Autonomous Self-Healing**:
-   - Injects missing CORS middleware or SPA fallback directly into codebase when enabled (`--heal`).
+5. **Propose-only Self-Healing**:
+   - With `--heal` or `loop`, writes a suggested patch (SPA fallback, Render build settings) for you to review. See below.
 
 ---
 
@@ -27,9 +27,24 @@
 # Diagnose any service on QA
 node bin/sentinel.js test oplox --env qa
 
-# Run with self-healing auto-patcher
+# Diagnose and write a proposed fix
 node bin/sentinel.js test audio-gym --env qa --heal
+
+# Same, as a single pass of the healing observer
+node bin/sentinel.js loop audio-gym --env qa
 
 # Run local control plane diagnostic doctor
 node bin/sentinel.js doctor
 ```
+
+---
+
+## 🔒 What healing may do
+
+Healing (`--heal`, `loop`, `heal-loop`, `auto-heal`) only proposes:
+
+- It writes `plan.md` and `patch.diff` to `~/.sentinel/proposals/` (or `SENTINEL_PROPOSALS_DIR`), outside the service.
+- It never edits, commits, pushes or runs anything in the service checkout. You apply the patch with `git apply`.
+- It only reads from Render. It never changes a service or starts a deploy.
+- It is refused for `--env prod` (exit code 2).
+- It never changes CORS. A blocked origin is reported so you can add it to the service's explicit allow-list.

@@ -5,7 +5,7 @@
 
 import { wakeUpNode, probeCors, probeSpaRouting, probeSseStream, probeApiEndpoints } from './probes/canary.js';
 import { diagnoseFailures } from './diagnostics/rootCause.js';
-import { executeSelfHealing } from './healer/autoPatch.js';
+import { assertHealingAllowed, executeSelfHealing } from './healer/autoPatch.js';
 import { runAutonomousHealingLoop } from './healer/healingLoop.js';
 
 export { runAutonomousHealingLoop };
@@ -20,6 +20,8 @@ export async function runSentinelDiagnostic({
   routes = ['/nodes', '/logs', '/metrics'],
   apiEndpoints = ['/api/apps', '/api/logs'],
 }) {
+  if (heal) assertHealingAllowed(env);
+
   if (!targetUrl) {
     targetUrl = env === 'local' ? 'http://localhost:5173' : `https://${serviceName}-${env}.onrender.com`;
   }
@@ -70,10 +72,10 @@ export async function runSentinelDiagnostic({
     apiResult,
   });
 
-  // Step 7: Autonomous Self-Healing (if enabled)
+  // Step 7: Propose a fix (if enabled). Nothing in the target is changed.
   let healingReport = null;
   if (heal && !diagnosis.isHealthy && serviceDir) {
-    console.log(`\n🛠️ [Sentinel] Engaging Autonomous Self-Healing Loop...`);
+    console.log(`\n🛠️ [Sentinel] Preparing a proposed fix for review...`);
     healingReport = await executeSelfHealing(diagnosis, serviceDir, { serviceName, env, targetUrl });
   }
 

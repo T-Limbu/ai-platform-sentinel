@@ -3,10 +3,9 @@
  * Main diagnostic and self-healing runner API
  */
 
-import path from 'path';
 import { wakeUpNode, probeCors, probeSpaRouting, probeSseStream, probeApiEndpoints } from './probes/canary.js';
 import { diagnoseFailures } from './diagnostics/rootCause.js';
-import { executeSelfHealing } from './healer/autoPatch.js';
+import { assertHealingAllowed, executeSelfHealing } from './healer/autoPatch.js';
 import { runAutonomousHealingLoop } from './healer/healingLoop.js';
 
 export { runAutonomousHealingLoop };
@@ -16,12 +15,13 @@ export async function runSentinelDiagnostic({
   env = 'qa',
   targetUrl,
   serviceDir,
-  infraRoot,
   clientOrigin = 'https://ai-platform-oplox-qa.onrender.com',
   heal = false,
   routes = ['/nodes', '/logs', '/metrics'],
   apiEndpoints = ['/api/apps', '/api/logs'],
 }) {
+  if (heal) assertHealingAllowed(env);
+
   if (!targetUrl) {
     targetUrl = env === 'local' ? 'http://localhost:5173' : `https://${serviceName}-${env}.onrender.com`;
   }
@@ -70,14 +70,13 @@ export async function runSentinelDiagnostic({
     spaResult,
     sseResult,
     apiResult,
-    infraRoot: infraRoot || path.resolve('../ai-platform-infra'),
   });
 
-  // Step 7: Autonomous Self-Healing (if enabled)
+  // Step 7: Propose a fix (if enabled). Nothing in the target is changed.
   let healingReport = null;
   if (heal && !diagnosis.isHealthy && serviceDir) {
-    console.log(`\n🛠️ [Sentinel] Engaging Autonomous Self-Healing Loop...`);
-    healingReport = await executeSelfHealing(diagnosis, serviceDir, infraRoot, { serviceName, env, targetUrl });
+    console.log(`\n🛠️ [Sentinel] Preparing a proposed fix for review...`);
+    healingReport = await executeSelfHealing(diagnosis, serviceDir, { serviceName, env, targetUrl });
   }
 
   return {

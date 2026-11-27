@@ -3,10 +3,7 @@
  * Analyzes canary failure signatures and maps them to concrete integration problems and fixes.
  */
 
-import fs from 'fs';
-import path from 'path';
-
-export function diagnoseFailures({ serviceName, env, targetUrl, wakeResult, corsResult, spaResult, sseResult, apiResult, infraRoot }) {
+export function diagnoseFailures({ serviceName, env, targetUrl, wakeResult, corsResult, spaResult, sseResult, apiResult }) {
   const issues = [];
 
   // 1. Diagnose Wake-Up / Cold Start
@@ -23,7 +20,7 @@ export function diagnoseFailures({ serviceName, env, targetUrl, wakeResult, cors
         `Verify buildCommand includes --include=dev so build tools are installed under NODE_ENV=production.`,
         `Verify startCommand binds to dynamic process.env.PORT on host 0.0.0.0.`,
         `Verify required production environment variables are configured on Render service.`,
-        `Run with --heal to automatically patch render.yaml, server host bindings, and synchronize with Render REST API.`,
+        `Run with --heal to write a proposed patch for render.yaml and server host bindings. Review it and apply it yourself.`,
       ],
       selfHealable: true,
       healAction: 'patch_render_deployment',
@@ -44,11 +41,9 @@ export function diagnoseFailures({ serviceName, env, targetUrl, wakeResult, cors
       },
       rootCause: `Cross-origin resource sharing middleware is either missing or does not include '${corsResult.testedOrigin}' in its allowlist.`,
       remediation: [
-        `Add '${corsResult.testedOrigin}' to cors({ origin: [...] }) in server configuration.`,
-        `Or enable cors() with permissive origin for QA environment ('*').`,
+        `Add '${corsResult.testedOrigin}' to the service's explicit CORS allow-list.`,
       ],
-      selfHealable: true,
-      healAction: 'patch_cors',
+      selfHealable: false,
     });
   }
 
@@ -104,29 +99,6 @@ export function diagnoseFailures({ serviceName, env, targetUrl, wakeResult, cors
       ],
       selfHealable: false,
     });
-  }
-
-  // 6. Check Environment Variable Drift (if infraRoot provided)
-  if (infraRoot) {
-    const envFile = path.join(infraRoot, `environments/${env}/${serviceName}.env`);
-    if (fs.existsSync(envFile)) {
-      const content = fs.readFileSync(envFile, 'utf-8');
-      const expectedKeys = content
-        .split('\n')
-        .map((l) => l.trim())
-        .filter((l) => l && !l.startsWith('#'))
-        .map((l) => l.split('=')[0]);
-
-      // Return expected keys in diagnostic summary
-      issues.push({
-        code: 'ENV_AUDIT_INFO',
-        severity: 'INFO',
-        title: `Environment manifest validated against ai-platform-infra`,
-        description: `Found ${expectedKeys.length} declared variables in environments/${env}/${serviceName}.env`,
-        evidence: { declaredKeys: expectedKeys },
-        selfHealable: false,
-      });
-    }
   }
 
   return {

@@ -43,7 +43,6 @@ async function main() {
       env,
       targetUrl,
       serviceDir: path.resolve(`../${service}`),
-      infraRoot: path.resolve('../ai-platform-infra'),
     });
 
     if (result.report) {
@@ -68,7 +67,6 @@ async function main() {
       targetUrl,
       heal: shouldHeal,
       serviceDir: path.resolve(`../${service}`),
-      infraRoot: path.resolve('../ai-platform-infra'),
     });
 
     printSummary(report);
@@ -88,7 +86,7 @@ async function main() {
     printSummary(report);
   } else {
     console.log(`\nUsage:`);
-    console.log(`  node bin/sentinel.js loop <service-name> [--env qa|prod|local]   (Continuous autonomous heal-loop)`);
+    console.log(`  node bin/sentinel.js loop <service-name> [--env qa|prod|local]   (Probe once and propose a fix)`);
     console.log(`  node bin/sentinel.js test <service-name> [--env qa|prod|local] [--heal]`);
     console.log(`  node bin/sentinel.js layout <app> --env qa [--report-only] [--config file] [--url baseUrl]   (needs SENTINEL_QA_PASSWORD)`);
     console.log(`  node bin/sentinel.js doctor`);
@@ -126,16 +124,26 @@ function printSummary(report) {
 
   if (report.healingReport) {
     console.log(`\n------------------------------------------------------`);
-    console.log(`🛠️  Autonomous Healing Summary:`);
-    console.log(`   Patches Applied: ${report.healingReport.healedCount}`);
-    for (const res of report.healingReport.results) {
-      console.log(`   • ${res.action} (${res.file})`);
+    const { proposal } = report.healingReport;
+    if (!proposal) {
+      console.log(`🛠️  No fix to propose.`);
+    } else {
+      console.log(`🛠️  Proposed fix (nothing was changed):`);
+      for (const action of proposal.actions) {
+        console.log(`   • ${action}`);
+      }
+      console.log(`   Plan:  ${proposal.planPath}`);
+      console.log(`   Patch: ${proposal.patchPath}`);
     }
   }
   console.log(`------------------------------------------------------\n`);
 }
 
 main().catch((err) => {
+  if (err.code === 'SENTINEL_HEAL_PROD') {
+    console.error(err.message);
+    process.exit(2);
+  }
   console.error(`Fatal Sentinel Error:`, err);
   process.exit(1);
 });
